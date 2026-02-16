@@ -20,7 +20,7 @@ spec:
         - name: pega-web
           image: nginx:1.25-alpine
           ports:
-            - containerPort: 8080
+            - containerPort: 80
               name: http
           env:
             - name: NODE_TYPE
@@ -37,12 +37,12 @@ spec:
           readinessProbe:
             httpGet:
               path: /
-              port: 8080
-            initialDelaySeconds: 10
+              port: 80
+            initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /
-              port: 8080
-            initialDelaySeconds: 30
+              port: 80
+            initialDelaySeconds: 10
             periodSeconds: 10
