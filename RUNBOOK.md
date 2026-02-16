@@ -1,33 +1,36 @@
 # ArgoCD + Kustomize Demo Runbook
 
-## What is this?
+## Overview
 
-Imagine you have 6 toy boxes (OPS, SBX, TEST, IMPL, TRNG, PROD). Each toy box should have the same toys, but some boxes get bigger toys and more of them. Instead of putting toys in each box by hand, you write a list (Git) of what goes where, and a robot (ArgoCD) reads that list and fills the boxes for you. If someone takes a toy out, the robot puts it back. That's GitOps.
+This runbook walks through setting up a local ArgoCD + Kustomize demo that manages 6 environments (OPS, SBX, TEST, IMPL, TRNG, PROD) with Strimzi Kafka and Karpenter resources. It is designed to be followed step-by-step, even if you're new to GitOps.
+
+**What you'll see by the end:** A single Git push automatically rolling out changes across 5 environments, with PROD held for manual approval -- all visible in ArgoCD's dashboard.
 
 ---
 
-## The Cast of Characters
+## Key Concepts
 
-| Tool | What it does (ELI5) |
-|------|---------------------|
-| **ArgoCD** | The robot that watches your list (Git repo) and makes sure your Kubernetes cluster matches it. If something changes in Git, ArgoCD updates the cluster. If someone messes with the cluster, ArgoCD fixes it. |
-| **Kustomize** | A copy machine with a "tweak" button. You write one set of files (the base), then say "for TEST, make 2 copies" and "for PROD, make 4 copies with more memory." No duplicating files everywhere. |
-| **Kind** | A mini Kubernetes cluster that runs inside Docker on your laptop. It's like a practice sandbox -- everything runs locally. |
-| **Strimzi** | Runs Apache Kafka (a message bus) on Kubernetes. Think of it like a post office inside your cluster. |
-| **Karpenter** | Automatically adds/removes servers (nodes) based on demand. If your apps need more room, Karpenter gets more servers. If they're idle, it removes them. Like an elastic parking lot. |
-| **Gitea** | A mini GitHub that runs inside the cluster (we replaced this with your real GitHub). |
+| Tool | Purpose |
+|------|---------|
+| **ArgoCD** | A GitOps continuous delivery tool. It watches a Git repository and continuously reconciles the Kubernetes cluster to match the declared state in Git. If someone manually changes the cluster, ArgoCD detects the drift and corrects it. |
+| **Kustomize** | A configuration management tool built into `kubectl`. It lets you define a shared base of Kubernetes manifests, then apply per-environment overrides (called overlays) without duplicating files. |
+| **Kind** | "Kubernetes IN Docker" -- a tool that runs a fully functional Kubernetes cluster locally inside Docker containers. Ideal for development and demos. |
+| **Strimzi** | A Kubernetes operator for running Apache Kafka clusters. It uses Custom Resources (e.g., `Kafka`, `KafkaTopic`) to define Kafka infrastructure declaratively. |
+| **Karpenter** | A Kubernetes node autoscaler (AWS). It provisions and terminates EC2 instances based on workload demand using `NodePool` and `EC2NodeClass` Custom Resources. |
 
 ---
 
 ## Prerequisites
 
-Before you start, you need these installed:
+Install the following tools via Homebrew:
 
-```
+```bash
 brew install kubectl kind helm kustomize
 ```
 
-And **Docker Desktop** running (the whale icon in your menu bar).
+You also need:
+- **Docker Desktop** installed and running
+- **Git** configured with access to your GitHub account
 
 ---
 
@@ -35,9 +38,7 @@ And **Docker Desktop** running (the whale icon in your menu bar).
 
 ### Step 1: Start Docker Desktop
 
-Open Docker Desktop from your Applications folder. Wait until the whale icon in the menu bar stops animating and says "Docker Desktop is running."
-
-**Why?** Kind creates a Kubernetes cluster using Docker containers. No Docker = no cluster.
+Launch Docker Desktop and wait until the status indicator confirms it is running. Kind requires a running Docker daemon to create clusters.
 
 ---
 
@@ -47,13 +48,14 @@ Open Docker Desktop from your Applications folder. Wait until the whale icon in 
 kind create cluster --name argocd-demo --config kind-config.yaml --wait 60s
 ```
 
-**What just happened?** You created a mini Kubernetes cluster on your laptop called `argocd-demo`. The `kind-config.yaml` tells it to open port 8443 so you can access ArgoCD's web UI later.
+This creates a single-node Kubernetes cluster named `argocd-demo`. The `kind-config.yaml` includes port mappings so the ArgoCD UI will be accessible at `https://localhost:8443`.
 
-**Verify it worked:**
+**Verify:**
 ```bash
 kubectl cluster-info --context kind-argocd-demo
 ```
-You should see "Kubernetes control plane is running at..."
+
+You should see the Kubernetes control plane URL in the output.
 
 ---
 
@@ -64,18 +66,20 @@ kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 ```
 
-**What just happened?** You created a room called `argocd` in your cluster and installed the ArgoCD robot in it. ArgoCD is just a bunch of pods (containers) running inside Kubernetes.
+This creates the `argocd` namespace and deploys the full ArgoCD stack (server, repo-server, application controller, redis, dex, and notifications controller).
 
-**Wait for it to be ready:**
+**Wait for the server to become available:**
 ```bash
 kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=120s
 ```
 
-This waits until ArgoCD's web server is up and running. Takes about 30-60 seconds.
+Typically takes 30-60 seconds.
 
 ---
 
 ### Step 4: Expose the ArgoCD UI
+
+By default, the ArgoCD server is only accessible from within the cluster. Expose it via NodePort so your browser can reach it:
 
 ```bash
 kubectl patch svc argocd-server -n argocd -p '{
@@ -86,31 +90,33 @@ kubectl patch svc argocd-server -n argocd -p '{
 }'
 ```
 
-**What just happened?** By default, ArgoCD's web page is hidden inside the cluster. This command punches a hole so your browser can reach it at `https://localhost:8443`.
+The ArgoCD UI is now available at `https://localhost:8443`. Your browser will show a certificate warning for the self-signed cert -- this is expected for a local setup.
 
 ---
 
-### Step 5: Get the Admin Password
+### Step 5: Retrieve the Admin Password
+
+ArgoCD generates a random admin password at install time and stores it as a Kubernetes Secret:
 
 ```bash
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 ```
 
-**What just happened?** ArgoCD generates a random password when it's installed and stores it as a Kubernetes Secret. This command reads and decodes it.
-
-**Write it down:**
-- URL: `https://localhost:8443`
-- Username: `admin`
-- Password: (the output from above)
-
-Open the URL in your browser. Accept the self-signed certificate warning. Log in.
+**Login credentials:**
+| Field | Value |
+|-------|-------|
+| URL | `https://localhost:8443` |
+| Username | `admin` |
+| Password | _(output from the command above)_ |
 
 ---
 
-### Step 6: Install the CRDs (Custom Resource Definitions)
+### Step 6: Install Custom Resource Definitions (CRDs)
+
+Our manifests include Strimzi Kafka and Karpenter resources. Kubernetes needs the CRD definitions registered before it can accept these resource types. We install the CRDs only -- not the full operators -- since this is a demo environment.
 
 ```bash
-# Strimzi (Kafka) CRDs
+# Strimzi CRDs
 kubectl apply -f https://raw.githubusercontent.com/strimzi/strimzi-kafka-operator/main/packaging/install/cluster-operator/040-Crd-kafka.yaml
 kubectl apply -f https://raw.githubusercontent.com/strimzi/strimzi-kafka-operator/main/packaging/install/cluster-operator/043-Crd-kafkatopic.yaml
 
@@ -158,7 +164,7 @@ spec:
 EOF
 ```
 
-**What just happened?** CRDs are like teaching Kubernetes new words. Kubernetes doesn't know what a "Kafka" or "NodePool" is by default. These CRDs say "Hey Kubernetes, here's what a Kafka object looks like" so it can store them. We're not running the actual operators (Strimzi/Karpenter) -- just teaching Kubernetes the vocabulary so ArgoCD can manage the resources.
+> **Note:** In a real environment, you would install the full Strimzi operator and Karpenter controller. Here we only register the CRD schemas so ArgoCD can manage the resource definitions without errors.
 
 ---
 
@@ -170,7 +176,7 @@ for ns in ops sbx test impl trng prod; do
 done
 ```
 
-**What just happened?** Namespaces are like folders in your cluster. Each environment gets its own folder so they don't step on each other. OPS stuff stays in `ops`, PROD stuff stays in `prod`.
+Each environment is isolated in its own namespace. This prevents resource name collisions and allows for per-namespace access controls and resource quotas.
 
 ---
 
@@ -185,92 +191,76 @@ kubectl apply -f argocd/app-ops.yaml \
               -f argocd/app-prod.yaml
 ```
 
-**What just happened?** You told ArgoCD: "Hey, here are 6 applications. Each one lives in a different folder in my Git repo. Go watch those folders and deploy whatever you find." Each Application manifest says:
-- **Where to look:** your GitHub repo + a specific path (e.g., `overlays/ops`)
-- **Where to deploy:** which namespace in the cluster
-- **How to sync:** automatically or manually
+Each Application manifest tells ArgoCD:
+- **Source:** Which Git repository and directory path to watch (e.g., `overlays/ops`)
+- **Destination:** Which cluster and namespace to deploy into
+- **Sync policy:** Whether to sync automatically or require manual approval
+
+OPS through TRNG are configured with `automated` sync (including `prune` and `selfHeal`). PROD is configured for **manual sync only**.
 
 ---
 
-### Step 9: Watch the Magic
+### Step 9: Verify in the ArgoCD UI
 
-Go to the ArgoCD UI at `https://localhost:8443`. You should see 6 application tiles:
+Open `https://localhost:8443` in your browser. You should see 6 application tiles:
 
-```
-pega-ops    pega-sbx    pega-test    pega-impl    pega-trng    pega-prod
-```
+| Status | Meaning |
+|--------|---------|
+| **Synced** (green) | Cluster state matches Git -- all resources are deployed and healthy |
+| **Progressing** (yellow) | ArgoCD is actively deploying or waiting for resources to become ready |
+| **OutOfSync** (orange) | The cluster state does not match Git -- a sync is needed |
+| **Degraded** (red) | One or more resources have failed health checks |
 
-- **Green (Synced + Healthy):** ArgoCD deployed everything and it's running fine
-- **Yellow (Progressing):** ArgoCD is still deploying / waiting for pods
-- **Orange (OutOfSync):** The cluster doesn't match Git yet
-- **Red (Degraded):** Something is broken
-
-Click on any app to see the resource tree:
-```
-Application
-  └── Deployment (pega-web)
-       └── ReplicaSet
-            └── Pod (running!)
-  └── Service
-  └── ConfigMap
-  └── Ingress
-  └── Kafka (Strimzi)
-  └── KafkaTopic
-  └── NodePool (Karpenter)
-  └── EC2NodeClass
-```
+Click on any application to see the full resource tree (Deployment, ReplicaSet, Pod, Service, ConfigMap, Ingress, Kafka, KafkaTopic, NodePool, EC2NodeClass).
 
 ---
 
-## Understanding the Project Structure
+## Project Structure Explained
 
-### The Base (the template)
+### Base Layer
 
 ```
 base/
-├── app/          <- The web application (Deployment, Service, ConfigMap, Ingress)
-├── strimzi/      <- Kafka cluster and topics
-└── karpenter/    <- Node scaling rules
+├── app/          # Pega web application: Deployment, Service, ConfigMap, Ingress
+├── strimzi/      # Kafka cluster and CDC topic definitions
+└── karpenter/    # NodePool and EC2NodeClass definitions
 ```
 
-This is like a blank form. It has everything but with default values.
+The base contains the canonical resource definitions with sensible defaults. All environments inherit from this.
 
-### The Overlays (the customizations)
+### Overlay Layer
 
 ```
 overlays/
-├── ops/          <- Fill in the form for OPS: 1 replica, small resources
-├── sbx/          <- Fill in the form for SBX: 1 replica, spot instances
-├── test/         <- Fill in the form for TEST: 2 replicas, medium resources
-├── impl/         <- Fill in the form for IMPL: 2 replicas, 3 Kafka brokers
-├── trng/         <- Fill in the form for TRNG: 2 replicas, medium resources
-└── prod/         <- Fill in the form for PROD: 4 replicas, big resources, persistent storage
+├── ops/          # 1 replica, minimal resources, spot + on-demand instances
+├── sbx/          # 1 replica, minimal resources, spot instances only
+├── test/         # 2 replicas, medium resources, mixed instance types
+├── impl/         # 2 replicas, production-like resources, 3-node Kafka (RF=2)
+├── trng/         # 2 replicas, medium resources, mixed instances
+└── prod/         # 4 replicas, high resources, 3-node Kafka (RF=3), persistent storage, zone spreading
 ```
 
-Each overlay says "take the base, but change these specific things." No copy-pasting entire files.
+Each overlay contains only the **differences** from the base. Kustomize merges the base + overlay at deploy time to produce the final manifests.
 
-### How Kustomize works (the simplest explanation)
+### How Kustomize Merging Works
 
 ```
-BASE (shared template)          OVERLAY (per-environment tweaks)
-─────────────────────           ────────────────────────────────
-Deployment: pega-web     +      replicas: 4              =    PROD Deployment with 4 replicas
-  replicas: 1                   cpu: 2 cores                  and 2 CPU cores
-  cpu: 250m                     memory: 4Gi                   and 4Gi memory
-  memory: 256Mi
+BASE                              OVERLAY (prod)                    RESULT
+────────────────────              ──────────────────                ──────────────────
+Deployment: pega-web              patches/app-replicas.yaml:        Deployment: pega-web
+  replicas: 1             +        replicas: 4              =        replicas: 4
+  cpu request: 250m                cpu request: 1                    cpu request: 1
+  memory request: 256Mi            memory request: 2Gi               memory request: 2Gi
 ```
 
-You write the base once. Each overlay only contains what's DIFFERENT. Kustomize merges them together.
+You can preview the merged output for any environment:
 
-**Try it yourself:**
 ```bash
-# See what OPS would look like (1 replica, small)
+# Preview the final manifests for a specific environment
 kustomize build overlays/ops
-
-# See what PROD would look like (4 replicas, big)
 kustomize build overlays/prod
 
-# Compare them side by side
+# Compare two environments side by side
 diff <(kustomize build overlays/ops) <(kustomize build overlays/prod)
 ```
 
@@ -278,149 +268,138 @@ diff <(kustomize build overlays/ops) <(kustomize build overlays/prod)
 
 ## Demo Scenarios
 
-### Demo 1: "Push a change, watch it roll out everywhere"
+### Demo 1: GitOps in Action -- Push and Watch
 
-This is the money shot. Shows GitOps in action.
+**Goal:** Show that a single Git push automatically propagates across all environments.
 
-**What to do:**
-1. Open the ArgoCD UI so your audience can see it
-2. Edit a file (e.g., change the nginx image tag):
+1. Open the ArgoCD UI on a shared screen
+2. Make a change to the base deployment (e.g., update the image tag):
    ```bash
-   # In base/app/deployment.yaml, change:
-   #   image: nginx:1.25-alpine
-   # to:
-   #   image: nginx:1.27-alpine
+   # Edit base/app/deployment.yaml
+   # Change: image: nginx:1.25-alpine
+   # To:     image: nginx:1.27-alpine
    ```
 3. Commit and push:
    ```bash
    git add -A && git commit -m "Upgrade nginx to 1.27" && git push origin master
    ```
-4. Watch the ArgoCD UI -- within 3 minutes, all auto-sync environments (OPS, SBX, TEST, IMPL, TRNG) will detect the change and start rolling out new pods
-5. PROD will show **OutOfSync** with an orange indicator -- it's waiting for someone to click "Sync"
+4. Watch the ArgoCD UI -- within ~3 minutes, ArgoCD detects the new commit and begins rolling out updated pods across OPS, SBX, TEST, IMPL, and TRNG
+5. PROD shows **OutOfSync** and waits for manual approval
 
-**What to tell your principal engineer:**
-> "I pushed one commit. ArgoCD automatically rolled out the change to 5 environments.
-> PROD is protected -- it requires a manual sync click. No one can accidentally deploy to PROD.
-> If I revert the commit in Git, ArgoCD will roll back all environments too."
+**Key takeaway:** One commit, one change in the base, and all environments update. PROD remains gated. If the change needs to be reverted, `git revert` rolls back all environments.
 
 ---
 
-### Demo 2: "Self-healing -- ArgoCD fixes things that break"
+### Demo 2: Self-Healing
 
-**What to do:**
-1. Delete a pod manually:
+**Goal:** Show that ArgoCD automatically restores resources that are manually deleted or modified.
+
+1. Delete a pod:
    ```bash
    kubectl delete pod -n test -l app=pega-web --wait=false
    ```
-2. Watch the ArgoCD UI -- within seconds, it detects the missing pod and recreates it
-3. Try something bigger -- delete the entire deployment:
+   ArgoCD detects the missing pod and the ReplicaSet recreates it within seconds.
+
+2. Delete an entire deployment:
    ```bash
    kubectl delete deployment pega-web -n test
    ```
-4. ArgoCD will recreate the entire deployment automatically
+   ArgoCD detects the missing Deployment and recreates it from the Git-defined state.
 
-**What to tell your principal engineer:**
-> "Someone could accidentally run kubectl delete in production. With ArgoCD's self-heal,
-> the desired state is always in Git. ArgoCD puts it back within seconds.
-> No pager. No incident. The cluster heals itself."
+**Key takeaway:** The desired state lives in Git, not in the cluster. Accidental deletions, unauthorized changes, or configuration drift are automatically corrected. This eliminates an entire class of incidents.
 
 ---
 
-### Demo 3: "Environment differences at a glance"
+### Demo 3: Environment Comparison
 
-**What to do:**
-1. Click on `pega-ops` in ArgoCD UI, then click "App Details"
-   - Show: 1 replica, small resources
-2. Click on `pega-prod` in ArgoCD UI, then click "App Details"
-   - Show: 4 replicas, large resources, persistent Kafka storage
-3. Click "Diff" tab to see what would change if you synced
+**Goal:** Show how easy it is to understand what differs between environments.
 
-**What to tell your principal engineer:**
-> "Every environment is defined in Git. Want to know the difference between TEST and PROD?
-> Look at the Git diff. No logging into servers. No comparing configs manually.
-> The Git history IS the audit trail."
+1. In the ArgoCD UI, click `pega-ops` > "App Details"
+   - Note: 1 replica, minimal CPU/memory
+2. Click `pega-prod` > "App Details"
+   - Note: 4 replicas, higher CPU/memory, persistent Kafka storage, zone topology constraints
 
----
-
-### Demo 4: "Manual PROD sync with approval"
-
-**What to do:**
-1. Notice `pega-prod` shows OutOfSync (orange)
-2. Click on it
-3. Click "Sync" button
-4. Review the diff (shows exactly what will change)
-5. Click "Synchronize" to approve
-
-**What to tell your principal engineer:**
-> "PROD never auto-deploys. A human has to review the diff and click Sync.
-> This is built into the ArgoCD Application config -- not a process someone can forget.
-> It's enforced by the system."
-
----
-
-### Demo 5: "Show what Kustomize does under the hood"
-
-Run these in your terminal while sharing your screen:
-
+Alternatively, compare via CLI:
 ```bash
-# Show the base (shared template)
-echo "=== BASE ===" && cat base/app/deployment.yaml
-
-# Show a small overlay patch
-echo "=== OPS PATCH ===" && cat overlays/ops/patches/app-replicas.yaml
-
-# Show a big overlay patch
-echo "=== PROD PATCH ===" && cat overlays/prod/patches/app-replicas.yaml
-
-# Show the final merged result for OPS
-echo "=== FINAL OPS OUTPUT ===" && kustomize build overlays/ops | grep -A5 "kind: Deployment"
-
-# Show the final merged result for PROD
-echo "=== FINAL PROD OUTPUT ===" && kustomize build overlays/prod | grep -A5 "kind: Deployment"
+diff <(kustomize build overlays/ops) <(kustomize build overlays/prod)
 ```
 
-**What to tell your principal engineer:**
-> "We maintain ONE base template. Each environment only overrides what's different.
-> OPS gets 1 replica with 100m CPU. PROD gets 4 replicas with 1 CPU and zone spreading.
-> If we need to update the image, we change it in ONE place (base) and all environments get it."
+**Key takeaway:** Environment differences are declarative and auditable. No need to SSH into clusters or compare running configs manually. The Git diff is the source of truth.
 
 ---
 
-## Quick Reference: Key Commands
+### Demo 4: Production Gating
 
-| What | Command |
+**Goal:** Show how PROD is protected from automatic deployments.
+
+1. After a Git push, notice that `pega-prod` shows **OutOfSync** (orange)
+2. Click on `pega-prod` in the ArgoCD UI
+3. Click **Sync** to review the pending changes
+4. Review the diff -- ArgoCD shows exactly what will be created, modified, or deleted
+5. Click **Synchronize** to approve the deployment
+
+**Key takeaway:** PROD deployments require explicit human approval. This is enforced at the system level (in the Application manifest), not as a process that someone might skip. The diff view provides a built-in change review before anything touches production.
+
+---
+
+### Demo 5: Kustomize Under the Hood
+
+**Goal:** Show how one base template serves all environments with minimal per-environment config.
+
+```bash
+# The shared base template
+cat base/app/deployment.yaml
+
+# A lightweight overlay (OPS: minimal)
+cat overlays/ops/patches/app-replicas.yaml
+
+# A production overlay (PROD: scaled up, zone-aware)
+cat overlays/prod/patches/app-replicas.yaml
+
+# The final merged output
+kustomize build overlays/ops | grep -A 20 "kind: Deployment"
+kustomize build overlays/prod | grep -A 30 "kind: Deployment"
+```
+
+**Key takeaway:** The base is maintained once. Each environment overlay is a small, focused patch containing only what differs. Updating a shared property (e.g., image version) requires changing one file, and all environments inherit the update.
+
+---
+
+## Quick Reference
+
+| Task | Command |
 |------|---------|
-| Check all apps | `kubectl get applications -n argocd` |
-| Check pods in an env | `kubectl get pods -n test` |
-| See what ArgoCD would deploy | `kustomize build overlays/test` |
+| List all ArgoCD applications | `kubectl get applications -n argocd` |
+| Check pods in an environment | `kubectl get pods -n test` |
+| Preview manifests for an env | `kustomize build overlays/test` |
 | Compare two environments | `diff <(kustomize build overlays/ops) <(kustomize build overlays/prod)` |
-| Force ArgoCD to re-check Git | Refresh button in the UI (or add annotation `argocd.argoproj.io/refresh: hard`) |
-| See ArgoCD logs | `kubectl logs -n argocd deployment/argocd-server` |
-| Get ArgoCD password again | `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" \| base64 -d` |
-| Delete everything and start over | `kind delete cluster --name argocd-demo` |
+| Force ArgoCD to re-check Git | Click Refresh in the UI, or annotate: `argocd.argoproj.io/refresh: hard` |
+| View ArgoCD server logs | `kubectl logs -n argocd deployment/argocd-server` |
+| Retrieve admin password | `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" \| base64 -d` |
+| Tear down the entire demo | `kind delete cluster --name argocd-demo` |
 
 ---
 
 ## Cleanup
 
-When you're done with the demo:
+To remove the entire demo environment:
 
 ```bash
 kind delete cluster --name argocd-demo
 ```
 
-That's it. Everything is gone. Docker containers removed. Your laptop is clean. Next time you want to demo, just run through the steps again (or use `./setup.sh`).
+This deletes the cluster and all associated Docker containers. Nothing persists on the host. To run the demo again, start from Step 1 or use the included `./setup.sh` script.
 
 ---
 
-## Why ArgoCD? (Cheat Sheet for the Conversation)
+## Why ArgoCD? (Discussion Points)
 
-| Without ArgoCD | With ArgoCD |
-|---------------|-------------|
-| Someone runs `kubectl apply` from their laptop | Changes go through Git (PR review, approval) |
-| "Who deployed this?" -- nobody knows | Git history shows who, what, when, why |
-| Cluster and Git drift apart silently | ArgoCD alerts on drift and auto-fixes |
-| PROD deploy is a scary manual process | PROD deploy is a reviewed, one-click sync |
-| Rollback = "does anyone have the old YAML?" | Rollback = `git revert` and ArgoCD handles it |
-| 6 environments = 6x the manual work | 6 environments = 1 base + 6 small overlays |
-| "Works on my cluster" | Declarative config in Git = reproducible everywhere |
+| Traditional Approach | GitOps with ArgoCD |
+|---------------------|-------------------|
+| Engineers run `kubectl apply` from their laptops | All changes go through Git with PR review and approval |
+| No clear audit trail for deployments | Full Git history: who changed what, when, and why |
+| Cluster configuration drifts silently from intended state | ArgoCD continuously monitors and corrects drift |
+| Production deployments are manual, error-prone processes | Production deployments are reviewed diffs with one-click approval |
+| Rollback means finding and reapplying old manifests | Rollback is `git revert` -- ArgoCD handles the rest |
+| Managing N environments means N times the manual effort | One base template + N lightweight overlays via Kustomize |
+| Environment parity is aspirational | Environment parity is enforced by the tooling |
