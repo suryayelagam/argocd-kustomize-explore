@@ -13,8 +13,8 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/local-demo/argocd-kustomize-explore.git
-    targetRevision: main
+    repoURL: http://gitea.gitea.svc.cluster.local:3000/demo/argocd-kustomize-explore.git
+    targetRevision: master
     path: overlays/prod
   destination:
     server: https://kubernetes.default.svc
