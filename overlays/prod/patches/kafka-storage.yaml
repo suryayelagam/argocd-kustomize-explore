@@ -1,0 +1,17 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: pega-kafka
+spec:
+  kafka:
+    storage:
+      type: persistent-claim
+      size: 100Gi
+      class: gp3
+      deleteClaim: false
+  zookeeper:
+    storage:
+      type: persistent-claim
+      size: 20Gi
+      class: gp3
+      deleteClaim: false

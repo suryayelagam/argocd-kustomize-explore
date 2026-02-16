@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pega-app-of-apps
+  namespace: argocd
+  labels:
+    app: app-of-apps
+    team: platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/local-demo/argocd-kustomize-explore.git
+    targetRevision: main
+    path: argocd
+    directory:
+      recurse: false
+      include: 'app-*.yaml'
+      exclude: 'app-of-apps.yaml'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

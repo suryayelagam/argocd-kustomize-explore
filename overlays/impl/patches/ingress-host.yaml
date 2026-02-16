@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pega-web
+spec:
+  rules:
+    - host: pega-impl.local
+      http:
+        paths:
+          - path: /prweb
+            pathType: Prefix
+            backend:
+              service:
+                name: pega-web
+                port:
+                  number: 80

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pega-config
+data:
+  JDBC_URL: "jdbc:postgresql://postgres:5432/pegadb"
+  PEGA_DIAGNOSTIC_USER_ENABLED: "true"
+  PEGA_APP_CONTEXT_PATH: "prweb"
