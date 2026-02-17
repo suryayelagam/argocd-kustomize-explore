@@ -10,7 +10,7 @@ metadata:
     alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:ACCOUNT:certificate/PLACEHOLDER"
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
-    alb.ingress.kubernetes.io/healthcheck-path: /prweb
+    alb.ingress.kubernetes.io/healthcheck-path: /prweb/PRRestService/monitor/pingService/ping
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
     alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
     alb.ingress.kubernetes.io/healthy-threshold-count: "2"
@@ -21,6 +21,13 @@ spec:
       http:
         paths:
           - path: /prweb
+            pathType: Prefix
+            backend:
+              service:
+                name: pega-web
+                port:
+                  number: 80
+          - path: /
             pathType: Prefix
             backend:
               service:

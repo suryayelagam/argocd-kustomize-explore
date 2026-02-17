@@ -12,6 +12,11 @@ spec:
   selector:
     matchLabels:
       app: pega-batch
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   template:
     metadata:
       labels:
@@ -20,22 +25,58 @@ spec:
         app.kubernetes.io/name: pega
         app.kubernetes.io/component: batch
     spec:
+      securityContext:
+        runAsUser: 9001
+        fsGroup: 0
+      terminationGracePeriodSeconds: 300
       containers:
-        - name: pega-batch
+        - name: pega-web-tomcat
           image: nginx:1.25-alpine
           ports:
             - containerPort: 80
               name: http
+              # Pega production: containerPort 8080
           env:
             - name: NODE_TYPE
-              value: "BackgroundProcessing,Search,Batch"
+              value: "BackgroundProcessing,Search,Batch,RealTime,Custom1,Custom2,Custom3,Custom4,Custom5,BIX"
+            - name: NODE_TIER
+              value: "batch"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: JDBC_URL
               valueFrom:
                 configMapKeyRef:
-                  name: pega-config
+                  name: pega-env-config
                   key: JDBC_URL
+            - name: JDBC_CLASS
+              valueFrom:
+                configMapKeyRef:
+                  name: pega-env-config
+                  key: JDBC_CLASS
+            - name: RULES_SCHEMA
+              valueFrom:
+                configMapKeyRef:
+                  name: pega-env-config
+                  key: RULES_SCHEMA
+            - name: DATA_SCHEMA
+              valueFrom:
+                configMapKeyRef:
+                  name: pega-env-config
+                  key: DATA_SCHEMA
             - name: JAVA_OPTS
-              value: "-Xms1g -Xmx2g -XX:+UseG1GC"
+              value: >-
+                -Xms2048m -Xmx4096m
+                -XX:+UseG1GC
+                -XX:MaxGCPauseMillis=200
+                -XX:+UseStringDeduplication
+                -XX:+AlwaysPreTouch
+                -XX:+HeapDumpOnOutOfMemoryError
+                -XX:HeapDumpPath=/heapdumps
+          envFrom:
+            - secretRef:
+                name: pega-db-secret
           resources:
             requests:
               cpu: 50m
@@ -43,15 +84,40 @@ spec:
             limits:
               cpu: 200m
               memory: 128Mi
-          readinessProbe:
+          # Pega production probe path: /prweb/PRRestService/monitor/pingService/ping on port 8080
+          startupProbe:
             httpGet:
               path: /
               port: 80
-            initialDelaySeconds: 10
+            failureThreshold: 30
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /
               port: 80
-            initialDelaySeconds: 15
-            periodSeconds: 15
+            initialDelaySeconds: 200
+            periodSeconds: 30
+            timeoutSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 20
+          volumeMounts:
+            - name: pega-config
+              mountPath: /opt/pega/config
+            - name: pega-secrets
+              mountPath: /opt/pega/secrets
+            - name: heapdumps
+              mountPath: /heapdumps
+      volumes:
+        - name: pega-config
+          configMap:
+            name: pega-batch-config
+        - name: pega-secrets
+          secret:
+            secretName: pega-db-secret
+        - name: heapdumps
+          emptyDir: {}

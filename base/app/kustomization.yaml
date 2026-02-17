@@ -6,9 +6,17 @@ resources:
   - deployment-batch.yaml
   - deployment-stream.yaml
   - service.yaml
-  - configmap.yaml
+  - configmap-env.yaml
+  - configmap-web.yaml
+  - configmap-batch.yaml
+  - configmap-stream.yaml
+  - secret-db.yaml
+  - secret-stream.yaml
   - ingress.yaml
   - hpa.yaml
+  - pdb-web.yaml
+  - pdb-batch.yaml
+  - pdb-stream.yaml
 
 labels:
   - pairs:

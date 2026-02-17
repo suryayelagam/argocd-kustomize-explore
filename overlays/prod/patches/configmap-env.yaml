@@ -1,10 +1,13 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: pega-config
+  name: pega-env-config
 data:
+  DB_TYPE: "postgresql"
   JDBC_URL: "jdbc:postgresql://postgres-prod:5432/pegadb"
+  RULES_SCHEMA: "rules"
+  DATA_SCHEMA: "data"
   PEGA_DIAGNOSTIC_USER_ENABLED: "false"
   ENVIRONMENT: "prod"
   CLUSTER_NAME: "eks-prod"
-  KAFKA_BOOTSTRAP_SERVERS: "pega-kafka-kafka-bootstrap:9092"
+  STREAM_BOOTSTRAP_SERVERS: "pega-kafka-kafka-bootstrap:9092"

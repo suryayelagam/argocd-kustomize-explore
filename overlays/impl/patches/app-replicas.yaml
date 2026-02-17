@@ -7,7 +7,7 @@ spec:
   template:
     spec:
       containers:
-        - name: pega-web
+        - name: pega-web-tomcat
           resources:
             requests:
               cpu: 50m
@@ -25,7 +25,7 @@ spec:
   template:
     spec:
       containers:
-        - name: pega-batch
+        - name: pega-web-tomcat
           resources:
             requests:
               cpu: 50m
@@ -43,7 +43,7 @@ spec:
   template:
     spec:
       containers:
-        - name: pega-stream
+        - name: pega-web-tomcat
           resources:
             requests:
               cpu: 50m

@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pega-batch-config
+data:
+  prconfig.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <pegarules>
+      <env name="initialization/settingsource" value="merged" />
+      <env name="prconfig/database/databases/PegaRULES/defaultSchema" value="rules" />
+      <env name="prconfig/database/databases/PegaDATA/defaultSchema" value="data" />
+      <env name="prconfig/async/enabled" value="true" />
+    </pegarules>
+  context.xml.tmpl: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <Context>
+      <Resource name="jdbc/PegaRULES"
+        auth="Container"
+        type="javax.sql.DataSource"
+        driverClassName="${JDBC_CLASS}"
+        url="${JDBC_URL}"
+        username="${DB_USERNAME}"
+        password="${DB_PASSWORD}"
+        maxTotal="${JDBC_MAX_ACTIVE}"
+        minIdle="${JDBC_MIN_IDLE}"
+        maxIdle="${JDBC_MAX_IDLE}" />
+    </Context>
+  prlog4j2.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <Configuration>
+      <Appenders>
+        <Console name="CONSOLE" target="SYSTEM_OUT">
+          <PatternLayout pattern="%d{ISO8601} [%t] %-5p %c - %m%n"/>
+        </Console>
+      </Appenders>
+      <Loggers>
+        <Root level="WARN"><AppenderRef ref="CONSOLE"/></Root>
+      </Loggers>
+    </Configuration>
