@@ -9,7 +9,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: pega-platform
+  project: default
   source:
     repoURL: https://github.com/suryayelagam/argocd-kustomize-explore.git
     targetRevision: master

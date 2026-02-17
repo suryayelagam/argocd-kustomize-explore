@@ -26,6 +26,10 @@ spec:
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
+    - group: karpenter.sh
+      kind: NodePool
+    - group: karpenter.k8s.aws
+      kind: EC2NodeClass
   namespaceResourceWhitelist:
     - group: ""
       kind: "*"
