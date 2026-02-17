@@ -26,7 +26,7 @@ spec:
         app.kubernetes.io/component: batch
     spec:
       securityContext:
-        runAsUser: 9001
+        # Pega production: runAsUser: 9001
         fsGroup: 0
       terminationGracePeriodSeconds: 300
       containers:
