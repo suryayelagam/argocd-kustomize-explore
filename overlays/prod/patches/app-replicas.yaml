@@ -15,11 +15,11 @@ spec:
         - name: pega-web
           resources:
             requests:
-              cpu: "1"
-              memory: 2Gi
+              cpu: 50m
+              memory: 64Mi
             limits:
-              cpu: "2"
-              memory: 4Gi
+              cpu: 200m
+              memory: 128Mi
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
@@ -40,11 +40,11 @@ spec:
         - name: pega-batch
           resources:
             requests:
-              cpu: "1"
-              memory: 2Gi
+              cpu: 50m
+              memory: 64Mi
             limits:
-              cpu: "2"
-              memory: 4Gi
+              cpu: 200m
+              memory: 128Mi
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
@@ -65,11 +65,11 @@ spec:
         - name: pega-stream
           resources:
             requests:
-              cpu: "1"
-              memory: 2Gi
+              cpu: 50m
+              memory: 64Mi
             limits:
-              cpu: "2"
-              memory: 4Gi
+              cpu: 200m
+              memory: 128Mi
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
