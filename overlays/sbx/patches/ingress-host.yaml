@@ -2,9 +2,11 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: pega-web
+  annotations:
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:111111111111:certificate/sbx-cert-placeholder"
 spec:
   rules:
-    - host: pega-sbx.local
+    - host: pega-sbx.company.internal
       http:
         paths:
           - path: /prweb

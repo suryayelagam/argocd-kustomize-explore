@@ -6,7 +6,9 @@ resources:
   - ../../base/strimzi
   - ../../base/karpenter
 
-namespace: test
+# Local demo: pega-test namespace (on shared Kind cluster)
+# Production: namespace would be "pega" on dedicated eks-test cluster
+namespace: pega-test
 
 labels:
   - pairs:
@@ -19,3 +21,5 @@ patches:
   - path: patches/karpenter-limits.yaml
   - path: patches/ingress-host.yaml
   - path: patches/configmap-env.yaml
+  - path: patches/ec2nodeclass-cluster.yaml
+  - path: patches/hpa-scaling.yaml

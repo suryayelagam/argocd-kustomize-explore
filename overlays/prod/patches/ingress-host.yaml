@@ -3,10 +3,11 @@ kind: Ingress
 metadata:
   name: pega-web
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:111111111111:certificate/prod-cert-placeholder"
 spec:
   rules:
-    - host: pega.local
+    - host: pega.company.com
       http:
         paths:
           - path: /prweb

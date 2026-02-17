@@ -6,7 +6,9 @@ resources:
   - ../../base/strimzi
   - ../../base/karpenter
 
-namespace: impl
+# Local demo: pega-impl namespace (on shared Kind cluster)
+# Production: namespace would be "pega" on dedicated eks-impl cluster
+namespace: pega-impl
 
 labels:
   - pairs:
@@ -19,3 +21,5 @@ patches:
   - path: patches/karpenter-limits.yaml
   - path: patches/ingress-host.yaml
   - path: patches/configmap-env.yaml
+  - path: patches/ec2nodeclass-cluster.yaml
+  - path: patches/hpa-scaling.yaml

@@ -11,14 +11,14 @@ metadata:
   annotations:
     notifications.argoproj.io/subscribe.on-sync-succeeded.slack: platform-alerts
 spec:
-  project: default
+  project: pega-platform
   source:
     repoURL: https://github.com/suryayelagam/argocd-kustomize-explore.git
     targetRevision: master
     path: overlays/prod
   destination:
-    server: https://kubernetes.default.svc
-    namespace: prod
+    name: eks-prod
+    namespace: pega-prod  # Production: would be "pega"
   syncPolicy:
     # PROD: Manual sync only -- no automated sync for safety
     syncOptions:

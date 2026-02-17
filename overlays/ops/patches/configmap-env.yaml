@@ -6,3 +6,5 @@ data:
   JDBC_URL: "jdbc:postgresql://postgres-ops:5432/pegadb"
   PEGA_DIAGNOSTIC_USER_ENABLED: "true"
   ENVIRONMENT: "ops"
+  CLUSTER_NAME: "eks-ops"
+  KAFKA_BOOTSTRAP_SERVERS: "pega-kafka-kafka-bootstrap:9092"

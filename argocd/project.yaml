@@ -1,0 +1,43 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: pega-platform
+  namespace: argocd
+spec:
+  description: Pega Platform multi-cluster deployment project
+  sourceRepos:
+    - https://github.com/suryayelagam/argocd-kustomize-explore.git
+  destinations:
+    - name: eks-ops
+      namespace: pega-ops
+    - name: eks-sbx
+      namespace: pega-sbx
+    - name: eks-test
+      namespace: pega-test
+    - name: eks-impl
+      namespace: pega-impl
+    - name: eks-trng
+      namespace: pega-trng
+    - name: eks-prod
+      namespace: pega-prod
+    # Allow ArgoCD to manage its own namespace for the app-of-apps
+    - name: in-cluster
+      namespace: argocd
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: ""
+      kind: "*"
+    - group: apps
+      kind: "*"
+    - group: networking.k8s.io
+      kind: "*"
+    - group: autoscaling
+      kind: "*"
+    - group: kafka.strimzi.io
+      kind: "*"
+    - group: karpenter.sh
+      kind: "*"
+    - group: karpenter.k8s.aws
+      kind: "*"

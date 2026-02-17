@@ -9,14 +9,14 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
+  project: pega-platform
   source:
     repoURL: https://github.com/suryayelagam/argocd-kustomize-explore.git
     targetRevision: master
     path: overlays/sbx
   destination:
-    server: https://kubernetes.default.svc
-    namespace: sbx
+    name: eks-sbx
+    namespace: pega-sbx  # Production: would be "pega"
   syncPolicy:
     automated:
       prune: true

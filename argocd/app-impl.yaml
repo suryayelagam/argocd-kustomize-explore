@@ -9,14 +9,14 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
+  project: pega-platform
   source:
     repoURL: https://github.com/suryayelagam/argocd-kustomize-explore.git
     targetRevision: master
     path: overlays/impl
   destination:
-    server: https://kubernetes.default.svc
-    namespace: impl
+    name: eks-impl
+    namespace: pega-impl  # Production: would be "pega"
   syncPolicy:
     automated:
       prune: true

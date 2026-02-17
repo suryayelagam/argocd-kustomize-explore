@@ -15,3 +15,39 @@ spec:
             limits:
               cpu: "1"
               memory: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pega-batch
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: pega-batch
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pega-stream
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: pega-stream
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi

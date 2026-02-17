@@ -9,7 +9,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
+  project: pega-platform
   source:
     repoURL: https://github.com/suryayelagam/argocd-kustomize-explore.git
     targetRevision: master
@@ -19,7 +19,7 @@ spec:
       include: 'app-*.yaml'
       exclude: 'app-of-apps.yaml'
   destination:
-    server: https://kubernetes.default.svc
+    name: in-cluster
     namespace: argocd
   syncPolicy:
     automated:

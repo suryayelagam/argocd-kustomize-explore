@@ -2,9 +2,11 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: pega-web
+  annotations:
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:111111111111:certificate/impl-cert-placeholder"
 spec:
   rules:
-    - host: pega-impl.local
+    - host: pega-impl.company.internal
       http:
         paths:
           - path: /prweb

@@ -1,46 +1,49 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: pega-web
+  name: pega-stream
   labels:
-    app: pega-web
-    tier: web
+    app: pega-stream
+    tier: stream
     app.kubernetes.io/name: pega
-    app.kubernetes.io/component: web
+    app.kubernetes.io/component: stream
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: pega-web
+      app: pega-stream
   template:
     metadata:
       labels:
-        app: pega-web
-        tier: web
+        app: pega-stream
+        tier: stream
         app.kubernetes.io/name: pega
-        app.kubernetes.io/component: web
+        app.kubernetes.io/component: stream
     spec:
       containers:
-        - name: pega-web
+        - name: pega-stream
           image: nginx:1.25-alpine
           ports:
             - containerPort: 80
               name: http
           env:
             - name: NODE_TYPE
-              value: "WebUser"
-            - name: PEGA_APP_CONTEXT_PATH
-              value: "prweb"
+              value: "Stream"
             - name: JDBC_URL
               valueFrom:
                 configMapKeyRef:
                   name: pega-config
                   key: JDBC_URL
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: pega-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
             - name: JAVA_OPTS
-              value: "-Xms1g -Xmx2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+              value: "-Xms512m -Xmx1g -XX:+UseG1GC"
           resources:
             requests:
-              cpu: 250m
+              cpu: 200m
               memory: 256Mi
             limits:
               cpu: 500m
@@ -49,11 +52,11 @@ spec:
             httpGet:
               path: /
               port: 80
-            initialDelaySeconds: 5
-            periodSeconds: 5
+            initialDelaySeconds: 10
+            periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /
               port: 80
-            initialDelaySeconds: 10
-            periodSeconds: 10
+            initialDelaySeconds: 15
+            periodSeconds: 15
