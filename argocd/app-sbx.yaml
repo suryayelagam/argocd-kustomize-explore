@@ -15,8 +15,9 @@ spec:
     targetRevision: master
     path: overlays/sbx
   destination:
-    name: eks-sbx
-    namespace: pega-sbx  # Production: would be "pega"
+    # Local demo: use server URL; Production: use "name: eks-sbx"
+    server: https://kubernetes.default.svc
+    namespace: pega-sbx
   syncPolicy:
     automated:
       prune: true

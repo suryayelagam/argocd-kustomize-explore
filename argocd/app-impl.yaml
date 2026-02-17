@@ -15,8 +15,9 @@ spec:
     targetRevision: master
     path: overlays/impl
   destination:
-    name: eks-impl
-    namespace: pega-impl  # Production: would be "pega"
+    # Local demo: use server URL; Production: use "name: eks-impl"
+    server: https://kubernetes.default.svc
+    namespace: pega-impl
   syncPolicy:
     automated:
       prune: true

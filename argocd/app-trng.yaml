@@ -15,8 +15,9 @@ spec:
     targetRevision: master
     path: overlays/trng
   destination:
-    name: eks-trng
-    namespace: pega-trng  # Production: would be "pega"
+    # Local demo: use server URL; Production: use "name: eks-trng"
+    server: https://kubernetes.default.svc
+    namespace: pega-trng
   syncPolicy:
     automated:
       prune: true

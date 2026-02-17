@@ -15,10 +15,10 @@ spec:
     targetRevision: master
     path: overlays/ops
   destination:
-    # In production: each env targets a separate EKS cluster
-    # Locally: all target the same Kind cluster, isolated by namespace
-    name: eks-ops
-    namespace: pega-ops  # Production: would be "pega"
+    # Local demo: all target the same Kind cluster, isolated by namespace
+    # Production: use "name: eks-ops" to target a separate EKS cluster
+    server: https://kubernetes.default.svc
+    namespace: pega-ops
   syncPolicy:
     automated:
       prune: true

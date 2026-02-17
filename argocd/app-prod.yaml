@@ -17,8 +17,9 @@ spec:
     targetRevision: master
     path: overlays/prod
   destination:
-    name: eks-prod
-    namespace: pega-prod  # Production: would be "pega"
+    # Local demo: use server URL; Production: use "name: eks-prod"
+    server: https://kubernetes.default.svc
+    namespace: pega-prod
   syncPolicy:
     # PROD: Manual sync only -- no automated sync for safety
     syncOptions:

@@ -8,21 +8,11 @@ spec:
   sourceRepos:
     - https://github.com/suryayelagam/argocd-kustomize-explore.git
   destinations:
-    - name: eks-ops
-      namespace: pega-ops
-    - name: eks-sbx
-      namespace: pega-sbx
-    - name: eks-test
-      namespace: pega-test
-    - name: eks-impl
-      namespace: pega-impl
-    - name: eks-trng
-      namespace: pega-trng
-    - name: eks-prod
-      namespace: pega-prod
-    # Allow ArgoCD to manage its own namespace for the app-of-apps
-    - name: in-cluster
-      namespace: argocd
+    # Local demo: all cluster secrets resolve to the same Kind cluster,
+    # so we use server wildcard + namespace pattern.
+    # Production: replace with explicit name/namespace pairs per cluster.
+    - server: '*'
+      namespace: 'pega-*'
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace

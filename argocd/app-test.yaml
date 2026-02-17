@@ -15,8 +15,9 @@ spec:
     targetRevision: master
     path: overlays/test
   destination:
-    name: eks-test
-    namespace: pega-test  # Production: would be "pega"
+    # Local demo: use server URL; Production: use "name: eks-test"
+    server: https://kubernetes.default.svc
+    namespace: pega-test
   syncPolicy:
     automated:
       prune: true
