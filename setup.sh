@@ -7,6 +7,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 echo "========================================="
 echo "  ArgoCD Multi-Cluster Demo Setup"
 echo "========================================="
+echo ""
+echo "This creates a local Kind cluster that simulates"
+echo "6 EKS environments, each with its own ArgoCD in production."
+echo "For the demo, one shared ArgoCD instance manages all 6."
 
 # ---- Step 1: Create Kind cluster ----
 if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
@@ -108,13 +112,10 @@ echo ""
 echo "[7/8] Registering cluster secrets (local demo -- all point to Kind cluster)..."
 kubectl apply -f "${SCRIPT_DIR}/argocd/clusters/cluster-secrets.yaml"
 
-# In production, you would use argocd CLI instead:
-# argocd cluster add arn:aws:eks:us-east-1:ACCOUNT:cluster/eks-ops --name eks-ops
-# argocd cluster add arn:aws:eks:us-east-1:ACCOUNT:cluster/eks-sbx --name eks-sbx
-# argocd cluster add arn:aws:eks:us-east-1:ACCOUNT:cluster/eks-test --name eks-test
-# argocd cluster add arn:aws:eks:us-east-1:ACCOUNT:cluster/eks-impl --name eks-impl
-# argocd cluster add arn:aws:eks:us-east-1:ACCOUNT:cluster/eks-trng --name eks-trng
-# argocd cluster add arn:aws:eks:us-east-1:ACCOUNT:cluster/eks-prod --name eks-prod
+# NOTE: Cluster secrets and app-of-apps are local demo conveniences only.
+# In production, each EKS cluster runs its own ArgoCD instance and applies
+# only its own Application manifest (e.g., app-prod.yaml). There is no
+# cross-cluster management. See README.md for production setup instructions.
 
 # ---- Step 8: Create AppProject ----
 echo ""
@@ -133,12 +134,15 @@ echo "Next steps:"
 echo "  1. Open the ArgoCD UI"
 echo "  2. Run: kubectl apply -f argocd/app-of-apps.yaml"
 echo "     (or apply individual apps from the argocd/ folder)"
-echo "  3. Watch ArgoCD sync all 6 environments across 6 'clusters'!"
+echo "  3. Watch ArgoCD sync all 6 environments!"
 echo ""
-echo "Architecture:"
-echo "  Management Cluster (Kind) --> eks-ops   (namespace: pega-ops)"
-echo "                             --> eks-sbx   (namespace: pega-sbx)"
-echo "                             --> eks-test  (namespace: pega-test)"
-echo "                             --> eks-impl  (namespace: pega-impl)"
-echo "                             --> eks-trng  (namespace: pega-trng)"
-echo "                             --> eks-prod  (namespace: pega-prod)"
+echo "Local demo architecture (one Kind cluster, namespace isolation):"
+echo "  ArgoCD (Kind) --> pega-ops   (simulates eks-ops)"
+echo "                --> pega-sbx   (simulates eks-sbx)"
+echo "                --> pega-test  (simulates eks-test)"
+echo "                --> pega-impl  (simulates eks-impl)"
+echo "                --> pega-trng  (simulates eks-trng)"
+echo "                --> pega-prod  (simulates eks-prod)"
+echo ""
+echo "Production: each EKS cluster runs its own ArgoCD instance."
+echo "See README.md for production setup instructions."

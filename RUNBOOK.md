@@ -2,41 +2,60 @@
 
 ## Overview
 
-This runbook walks through setting up a local ArgoCD multi-cluster demo that manages Pega Platform deployments across 6 EKS clusters from a single management cluster. Each cluster runs a multi-tier Pega deployment (Web, Batch, Stream) with Kafka, Karpenter autoscaling, and HPA.
+This runbook walks through setting up a local ArgoCD demo that simulates 6 EKS environments. In production, each EKS cluster runs its own ArgoCD instance managing only itself. The local demo uses one shared ArgoCD instance with namespace isolation to simulate this.
 
-**What you'll see by the end:** ArgoCD managing 6 named clusters from a central hub, with a single Git push automatically rolling out multi-tier Pega changes across 5 environments while PROD is held for manual approval.
+**What you'll see by the end:** ArgoCD managing 6 environments, with a single Git push automatically rolling out multi-tier Pega changes across 5 environments while PROD is held for manual approval.
 
 ---
 
 ## Architecture
 
+### Production (Per-Cluster ArgoCD)
+
 ```
-                      ┌──────────────────────────────┐
-                      │    Management Cluster (Kind)  │
-                      │                              │
-                      │   ┌────────────────────┐     │
-                      │   │   ArgoCD Server     │     │
-                      │   │   (watches GitHub)  │     │
-                      │   └────────┬───────────┘     │
-                      └────────────┼─────────────────┘
-                                   │
-            ┌──────────┬──────────┬┴──────────┬──────────┬──────────┐
-            ▼          ▼          ▼           ▼          ▼          ▼
-       ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
-       │ eks-ops │ │ eks-sbx │ │eks-test │ │eks-impl │ │eks-trng │ │eks-prod │
-       │ (VPC-1) │ │ (VPC-2) │ │ (VPC-3) │ │ (VPC-4) │ │ (VPC-5) │ │ (VPC-6) │
-       │         │ │         │ │         │ │         │ │         │ │         │
-       │ pega-web│ │ pega-web│ │ pega-web│ │ pega-web│ │ pega-web│ │ pega-web│
-       │ pega-   │ │ pega-   │ │ pega-   │ │ pega-   │ │ pega-   │ │ pega-   │
-       │  batch  │ │  batch  │ │  batch  │ │  batch  │ │  batch  │ │  batch  │
-       │ pega-   │ │ pega-   │ │ pega-   │ │ pega-   │ │ pega-   │ │ pega-   │
-       │  stream │ │  stream │ │  stream │ │  stream │ │  stream │ │  stream │
-       │ kafka   │ │ kafka   │ │ kafka   │ │ kafka   │ │ kafka   │ │ kafka   │
-       └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘
-         auto        auto        auto        auto        auto       MANUAL
+                         GitHub Repository
+                               │
+        ┌───────┬────────┬─────┴─────┬────────┬────────┐
+        ▼       ▼        ▼           ▼        ▼        ▼
+   ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
+   │ eks-ops │ │ eks-sbx │ │eks-test │ │eks-impl │ │eks-trng │ │eks-prod │
+   │ (VPC-1) │ │ (VPC-2) │ │ (VPC-3) │ │ (VPC-4) │ │ (VPC-5) │ │ (VPC-6) │
+   │         │ │         │ │         │ │         │ │         │ │         │
+   │ ArgoCD  │ │ ArgoCD  │ │ ArgoCD  │ │ ArgoCD  │ │ ArgoCD  │ │ ArgoCD  │
+   │ pega-web│ │ pega-web│ │ pega-web│ │ pega-web│ │ pega-web│ │ pega-web│
+   │ pega-   │ │ pega-   │ │ pega-   │ │ pega-   │ │ pega-   │ │ pega-   │
+   │  batch  │ │  batch  │ │  batch  │ │  batch  │ │  batch  │ │  batch  │
+   │ pega-   │ │ pega-   │ │ pega-   │ │ pega-   │ │ pega-   │ │ pega-   │
+   │  stream │ │  stream │ │  stream │ │  stream │ │  stream │ │  stream │
+   │ kafka   │ │ kafka   │ │ kafka   │ │ kafka   │ │ kafka   │ │ kafka   │
+   └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘
+     auto        auto        auto        auto        auto       MANUAL
 ```
 
-**Local demo:** All 6 clusters are simulated as namespaces (`pega-ops`, `pega-sbx`, etc.) on a single Kind cluster. ArgoCD cluster secrets all point to `https://kubernetes.default.svc`.
+Each cluster independently:
+1. Installs ArgoCD in the `argocd` namespace
+2. Applies `project.yaml` and its own `app-<env>.yaml`
+3. Deploys to `https://kubernetes.default.svc` (in-cluster only)
+
+There is no central management cluster or cross-cluster access.
+
+### Local Demo (Kind)
+
+```
+   ┌──────────────────────────────────────┐
+   │         Kind Cluster (argocd-demo)   │
+   │                                      │
+   │   ArgoCD (shared, simulates 6)       │
+   │   ├── pega-ops   namespace           │
+   │   ├── pega-sbx   namespace           │
+   │   ├── pega-test  namespace           │
+   │   ├── pega-impl  namespace           │
+   │   ├── pega-trng  namespace           │
+   │   └── pega-prod  namespace           │
+   └──────────────────────────────────────┘
+```
+
+The app-of-apps pattern and cluster secrets are **local demo conveniences only** to deploy all 6 environments from one ArgoCD instance.
 
 ---
 
@@ -44,15 +63,13 @@ This runbook walks through setting up a local ArgoCD multi-cluster demo that man
 
 | Concept | Description |
 |---------|-------------|
-| **Management Cluster** | The central cluster where ArgoCD runs. It doesn't host application workloads -- it manages other clusters. |
-| **Cluster Secrets** | Kubernetes Secrets labeled `argocd.argoproj.io/secret-type: cluster` that register target clusters with ArgoCD by name. |
-| **AppProject** | ArgoCD resource that restricts which repos, clusters, and namespaces an Application can target. Security boundary. |
-| **destination.name** | ArgoCD Application field that references a cluster by name (from cluster secrets) instead of by API server URL. |
+| **Per-Cluster ArgoCD** | Each EKS cluster runs its own ArgoCD, managing only its own resources. No cross-cluster management. |
+| **AppProject** | ArgoCD resource that restricts which repos, namespaces, and resource types an Application can target. |
 | **Multi-Tier Pega** | Web (user-facing), Batch (background processing), Stream (Kafka consumers) -- each is a separate Deployment. |
 | **Kustomize** | Base + overlay pattern: shared manifests with per-environment patches. No duplication. |
 | **Strimzi** | Kubernetes operator for Apache Kafka. Uses `Kafka` and `KafkaTopic` Custom Resources. |
 | **Karpenter** | AWS node autoscaler. Uses `NodePool` and `EC2NodeClass` to provision right-sized EC2 instances. |
-| **HPA** | Horizontal Pod Autoscaler. Scales pega-web pods based on CPU/memory utilization. |
+| **HPA** | Horizontal Pod Autoscaler. Scales pega-web pods based on CPU utilization. |
 
 ---
 
@@ -140,15 +157,13 @@ for ns in pega-ops pega-sbx pega-test pega-impl pega-trng pega-prod; do
 done
 ```
 
-#### Step 7: Register Cluster Secrets
+#### Step 7: Register Cluster Secrets (Local Demo Only)
 
 ```bash
 kubectl apply -f argocd/clusters/cluster-secrets.yaml
 ```
 
-This creates 6 Kubernetes Secrets in the `argocd` namespace, each labeled `argocd.argoproj.io/secret-type: cluster`. ArgoCD uses these to resolve `destination.name` in Application manifests.
-
-For production, use `argocd cluster add` instead (see `argocd/clusters/README.md`).
+This creates 6 Kubernetes Secrets in the `argocd` namespace so one ArgoCD instance can simulate deploying to 6 separate clusters. **This step is not needed in production** -- each cluster's ArgoCD deploys to itself.
 
 #### Step 8: Create the AppProject
 
@@ -158,7 +173,6 @@ kubectl apply -f argocd/project.yaml
 
 The `pega-platform` AppProject restricts Applications to:
 - Source: only this Git repository
-- Destinations: only the 6 named EKS clusters
 - Namespaces: only `pega-*` namespaces
 
 #### Deploy
@@ -173,7 +187,7 @@ kubectl apply -f argocd/app-of-apps.yaml
 
 ### Demo 1: Multi-Cluster GitOps -- Push and Watch
 
-**Goal:** Show a single Git push propagating across 6 clusters.
+**Goal:** Show a single Git push propagating across 6 environments.
 
 1. Open the ArgoCD UI -- all 6 apps are visible as tiles
 2. Modify `base/app/deployment.yaml` (e.g., change the image tag):
@@ -186,7 +200,7 @@ kubectl apply -f argocd/app-of-apps.yaml
 3. Watch ArgoCD detect the change and sync all 5 auto-sync environments
 4. PROD shows **OutOfSync** -- requires manual approval
 
-**Key takeaway:** One commit changes the base. All 6 clusters update. Three Deployments (web, batch, stream) each get the new image. PROD remains gated.
+**Key takeaway:** One commit changes the base. All 6 environments update. Three Deployments (web, batch, stream) each get the new image. PROD remains gated.
 
 ---
 
@@ -222,7 +236,7 @@ diff <(kustomize build overlays/ops) <(kustomize build overlays/prod)
 #          3 Kafka brokers RF=3, persistent storage, zone spreading, HPA 4-12
 ```
 
-In the ArgoCD UI, click any app to see the full resource tree: 3 Deployments, HPA, Service, ConfigMap, Ingress, Kafka, KafkaTopic, NodePool, EC2NodeClass.
+In the ArgoCD UI, click any app to see the full resource tree: 3 Deployments, HPA, Service, 4 ConfigMaps, 2 Secrets, Ingress, 3 PDBs, Kafka, KafkaTopic, NodePool, EC2NodeClass.
 
 ---
 
@@ -232,7 +246,7 @@ In the ArgoCD UI, click any app to see the full resource tree: 3 Deployments, HP
 
 1. After a Git push, `pega-prod` shows **OutOfSync** (orange)
 2. Click `pega-prod` > **Sync** to review the diff
-3. ArgoCD shows exactly what will change across all 11 resources
+3. ArgoCD shows exactly what will change across all resources
 4. Click **Synchronize** to approve
 
 **Key takeaway:** PROD requires explicit human approval enforced at the system level, not as a skippable process.
@@ -259,17 +273,18 @@ cat overlays/prod/patches/hpa-scaling.yaml
 
 ## Adapting for Real EKS
 
-### 1. Cluster Registration
+### 1. Install ArgoCD on Each Cluster
 
-Replace the demo cluster secrets with proper `argocd cluster add` commands:
+Each EKS cluster gets its own ArgoCD installation:
 
 ```bash
-argocd cluster add arn:aws:eks:us-east-1:ACCOUNT:cluster/eks-ops --name eks-ops
-argocd cluster add arn:aws:eks:us-east-1:ACCOUNT:cluster/eks-sbx --name eks-sbx
-argocd cluster add arn:aws:eks:us-east-1:ACCOUNT:cluster/eks-test --name eks-test
-argocd cluster add arn:aws:eks:us-east-1:ACCOUNT:cluster/eks-impl --name eks-impl
-argocd cluster add arn:aws:eks:us-east-1:ACCOUNT:cluster/eks-trng --name eks-trng
-argocd cluster add arn:aws:eks:us-east-1:ACCOUNT:cluster/eks-prod --name eks-prod
+# Run this on each EKS cluster
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+# Apply the project and the cluster's specific Application
+kubectl apply -f argocd/project.yaml
+kubectl apply -f argocd/app-prod.yaml   # or app-ops.yaml, app-test.yaml, etc.
 ```
 
 ### 2. Namespace Changes
@@ -287,12 +302,19 @@ Update each overlay's `ingress-host.yaml`:
 
 Update each overlay's `configmap-env.yaml`:
 - `JDBC_URL`: point to actual RDS endpoints
-- `KAFKA_BOOTSTRAP_SERVERS`: point to actual MSK or Strimzi brokers
+- `STREAM_BOOTSTRAP_SERVERS`: point to actual MSK or Strimzi brokers
 
 ### 5. Karpenter VPC Tags
 
 Update each overlay's `ec2nodeclass-cluster.yaml`:
 - Subnet and security group discovery tags must match your VPC tagging scheme
+
+### 6. Secrets Management
+
+Replace placeholder secrets with real credentials:
+- Use AWS Secrets Manager + External Secrets Operator, or
+- Use sealed-secrets, or
+- Manage secrets outside of Git entirely
 
 ---
 
@@ -306,7 +328,6 @@ Update each overlay's `ec2nodeclass-cluster.yaml`:
 | Preview manifests | `kustomize build overlays/test` |
 | Compare two envs | `diff <(kustomize build overlays/ops) <(kustomize build overlays/prod)` |
 | Count resources per env | `kustomize build overlays/ops \| grep "^kind:" \| sort \| uniq -c` |
-| List registered clusters | `kubectl get secrets -n argocd -l argocd.argoproj.io/secret-type=cluster` |
 | Force ArgoCD refresh | Click Refresh in UI, or `kubectl annotate app pega-ops -n argocd argocd.argoproj.io/refresh=hard` |
 | View ArgoCD logs | `kubectl logs -n argocd deployment/argocd-server` |
 | Retrieve admin password | `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" \| base64 -d` |
@@ -331,7 +352,6 @@ This deletes the cluster and all associated Docker containers. Nothing persists 
 | Engineers run `kubectl apply` from their laptops | All changes go through Git with PR review and approval |
 | No clear audit trail for deployments | Full Git history: who changed what, when, and why |
 | Cluster configuration drifts silently | ArgoCD continuously monitors and corrects drift |
-| Managing N clusters means N times the manual effort | One management cluster manages all targets centrally |
 | Copy-pasting manifests across clusters | One base template + N lightweight overlays via Kustomize |
 | Production deployments are manual, error-prone | Production deployments are reviewed diffs with one-click approval |
 | Rollback means finding and reapplying old manifests | Rollback is `git revert` -- ArgoCD handles the rest |
